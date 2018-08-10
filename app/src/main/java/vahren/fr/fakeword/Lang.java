@@ -1,5 +1,8 @@
 package vahren.fr.fakeword;
 
+
+import android.content.Context;
+
 /**
  * Created by fdroumaguet on 10/08/18.
  */

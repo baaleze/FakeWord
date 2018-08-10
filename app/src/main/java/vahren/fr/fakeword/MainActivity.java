@@ -1,5 +1,8 @@
 package vahren.fr.fakeword;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.os.AsyncTask;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
@@ -23,6 +26,7 @@ import android.support.v7.widget.ThemedSpinnerAdapter;
 import android.content.res.Resources.Theme;
 
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.w3c.dom.Text;
 
@@ -42,6 +46,9 @@ public class MainActivity extends AppCompatActivity {
 
     private static Lang[] langs;
 
+    private static ClipboardManager clip;
+    private static RiMarkov currentMarkov;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,12 +60,14 @@ public class MainActivity extends AppCompatActivity {
                 new Lang(R.raw.japanese, "Japanese", 2, 8, new JapaneseRomanizer(),
                         new String[]{"・", "ょ", "ッ", "っ", "ャ", "ゥ", "ゃ", "ゅ", "ィ", "ァ","ェ", "ォ","ョ", "ー", "ュ" ,"ン", "ん"}),
                 new Lang(R.raw.swedish, "Swedish", 4, 12, null, new String[]{}),
-                new Lang(R.raw.korean, "Korean", 2, 8, new KoreanRomanizer(), new String[]{}),
+                new Lang(R.raw.korean, "Korean", 1, 4, new KoreanRomanizer(), new String[]{}),
                 new Lang(R.raw.chinese, "Chinese", 2, 8, new ChineseRomanizer(), new String[]{}),
                 new Lang(R.raw.breton, "Breton", 4, 12, null, new String[]{})
         };
 
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+        clip = (ClipboardManager) getApplicationContext().getSystemService(Context.CLIPBOARD_SERVICE);
+
+        Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayShowTitleEnabled(false);
 
@@ -67,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
         for(int i =0; i<strLang.length;i++){
             strLang[i] = MainActivity.langs[i].lang;
         }
-        Spinner spinner = (Spinner) findViewById(R.id.spinner);
+        Spinner spinner = findViewById(R.id.spinner);
         spinner.setAdapter(new MyAdapter(
                 toolbar.getContext(), strLang));
 
@@ -110,7 +119,7 @@ public class MainActivity extends AppCompatActivity {
                 view = convertView;
             }
 
-            TextView textView = (TextView) view.findViewById(android.R.id.text1);
+            TextView textView = view.findViewById(android.R.id.text1);
             textView.setText(getItem(position));
 
             return view;
@@ -131,16 +140,16 @@ public class MainActivity extends AppCompatActivity {
     /**
      * A placeholder fragment containing a simple view.
      */
-    public static class PlaceholderFragment extends Fragment implements View.OnTouchListener {
+    public static class PlaceholderFragment extends Fragment implements View.OnClickListener, View.OnLongClickListener {
         /**
          * The fragment argument representing the section number for this
          * fragment.
          */
         private static final String ARG_SECTION_NUMBER = "section_number";
-        private RiMarkov markov;
-        private Lang lang;
         private TextView wordView;
         private TextView wordSubView;
+        private Lang lang;
+        private View rootView;
 
         public PlaceholderFragment() {
         }
@@ -160,52 +169,56 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public View onCreateView(LayoutInflater inflater, ViewGroup container,
                                  Bundle savedInstanceState) {
-            View rootView = inflater.inflate(R.layout.fragment_main, container, false);
+            rootView = inflater.inflate(R.layout.fragment_main, container, false);
             lang = MainActivity.langs[getArguments().getInt(ARG_SECTION_NUMBER)];
             TextView textView = rootView.findViewById(R.id.section_label);
             textView.setText("Generating "  + lang.lang);
             wordView = rootView.findViewById(R.id.gen_word);
             wordSubView = rootView.findViewById(R.id.word_sub);
-            try {
-                // instantiate markov generator
-                this.markov = this.loadUniqueNames(
-                        this.readResource(lang.file,rootView.getContext())
-                );
-                this.gen(rootView);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            // do this in an async task as it's LOOONG
+            new Markov(rootView).execute(lang);
             // touch
-            rootView.setOnTouchListener(this);
+            rootView.setOnClickListener(this);
+            rootView.setOnLongClickListener(this);
 
             return rootView;
         }
 
         @Override
-        public boolean onTouch(View v, MotionEvent event) {
-            Log.d("FAKE", "touched!");
-            this.gen(v);
-            v.performClick();
-            return false;
+        public void onClick(View v) {
+            this.gen();
         }
 
-        private void gen(View v){
-
-            String[] chars = this.markov.generateTokens(MainActivity.random(lang.minLength, lang.maxLength));
-            StringBuffer word = new StringBuffer();
-            int i = 0;
-            for(String s:chars){
-                if (i > 0 || !isIllegal(lang.illegalStarts, s)){
-                    word.append(s);
-                }
-                i++;
-
+        @Override
+        public boolean onLongClick(View view) {
+            StringBuilder words =  new StringBuilder();
+            words.append(this.wordView.getText());
+            if(this.wordSubView.getText() != null && this.wordSubView.getText().length() > 0){
+                words.append(this.wordSubView.getText());
             }
-            wordView.setText(word);
-            if (lang.romanizer != null){
-                wordSubView.setText(lang.romanizer.toRoman(word.toString()));
-            } else {
-                wordSubView.setText("");
+            clip.setPrimaryClip(ClipData.newPlainText("Fake text", words.toString()));
+            Toast.makeText(view.getContext(), "Copied to clipboard", Toast.LENGTH_SHORT).show();
+            return true;
+        }
+
+        private void gen(){
+            if (currentMarkov != null) {
+                String[] chars = currentMarkov.generateTokens(MainActivity.random(lang.minLength, lang.maxLength));
+                StringBuffer word = new StringBuffer();
+                int i = 0;
+                for(String s:chars){
+                    if (i > 0 || !isIllegal(lang.illegalStarts, s)){
+                        word.append(s);
+                    }
+                    i++;
+
+                }
+                wordView.setText(word);
+                if (lang.romanizer != null){
+                    wordSubView.setText(lang.romanizer.toRoman(word.toString()));
+                } else {
+                    wordSubView.setText("");
+                }
             }
         }
 
@@ -218,15 +231,45 @@ public class MainActivity extends AppCompatActivity {
             return false;
         }
 
-        private List<String> readResource(int resId, Context context) throws IOException {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(context.getResources().openRawResource(resId)));
-            List<String> s = new LinkedList<>();
-            String readLine;
-            while ((readLine = reader.readLine()) != null) {
-                s.add(readLine);
+    }
+
+    private static class Markov extends AsyncTask<Lang, Void, RiMarkov> {
+
+        private final View view;
+        private final Context context;
+        private Lang lang;
+
+        public Markov(View rootView) {
+            this.view = rootView;
+            this.context = rootView.getContext();
+        }
+
+        @Override
+        protected void onPreExecute() {
+            ((TextView)view.findViewById(R.id.gen_word)).setText("LOADING");
+            ((TextView)view.findViewById(R.id.word_sub)).setText("...");
+            currentMarkov = null;
+        }
+
+        @Override
+        protected RiMarkov doInBackground(Lang... langs) {
+            lang = langs[0];
+            try {
+                // instantiate markov generator
+                return this.loadUniqueNames(
+                        this.readResource(lang.file,this.context)
+                );
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            reader.close();
-            return s;
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(RiMarkov riMarkov) {
+            ((TextView)view.findViewById(R.id.gen_word)).setText("READY");
+            ((TextView)view.findViewById(R.id.word_sub)).setText("");
+            currentMarkov = riMarkov;
         }
 
         private RiMarkov loadUniqueNames(List<String> names) {
@@ -254,7 +297,21 @@ public class MainActivity extends AppCompatActivity {
             uniqueGen.loadTokens(tokensArray);
             return uniqueGen;
         }
+
+
+        private List<String> readResource(int resId, Context context) throws IOException {
+            BufferedReader reader = new BufferedReader(new InputStreamReader(context.getResources().openRawResource(resId)));
+            List<String> s = new LinkedList<>();
+            String readLine;
+            while ((readLine = reader.readLine()) != null) {
+                s.add(readLine);
+            }
+            reader.close();
+            return s;
+        }
+
     }
+
 
     private static int random(int minLength, int maxLength) {
         return (int) Math.floor(Math.random() *  (maxLength-minLength) + minLength);
