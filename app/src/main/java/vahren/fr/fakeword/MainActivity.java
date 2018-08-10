@@ -3,18 +3,12 @@ package vahren.fr.fakeword;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.os.AsyncTask;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -28,12 +22,7 @@ import android.content.res.Resources.Theme;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.w3c.dom.Text;
-
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Iterator;
@@ -48,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static ClipboardManager clip;
     private static RiMarkov currentMarkov;
+    private static final String END = "$";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,14 +45,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         MainActivity.langs = new Lang[]{
-                new Lang(R.raw.french, "French", 4, 12, null, new String[]{}),
-                new Lang(R.raw.english, "English", 4, 12, null, new String[]{}),
+                new Lang(R.raw.french, "French", 4, 12, null, new String[]{"-"}, 5),
+                new Lang(R.raw.english, "English", 4, 12, null, new String[]{"-"}, 5),
                 new Lang(R.raw.japanese, "Japanese", 2, 8, new JapaneseRomanizer(),
-                        new String[]{"・", "ょ", "ッ", "っ", "ャ", "ゥ", "ゃ", "ゅ", "ィ", "ァ","ェ", "ォ","ョ", "ー", "ュ" ,"ン", "ん"}),
-                new Lang(R.raw.swedish, "Swedish", 4, 12, null, new String[]{}),
-                new Lang(R.raw.korean, "Korean", 1, 4, new KoreanRomanizer(), new String[]{}),
-                new Lang(R.raw.chinese, "Chinese", 2, 8, new ChineseRomanizer(), new String[]{}),
-                new Lang(R.raw.breton, "Breton", 4, 12, null, new String[]{})
+                        new String[]{"・", "ょ", "ッ", "っ", "ャ", "ゥ", "ゃ", "ゅ", "ィ", "ァ","ェ", "ォ","ョ", "ー", "ュ" ,"ン", "ん"}, 3),
+                new Lang(R.raw.norsk, "Norwegian", 6, 15, null, new String[]{}, 5),
+                new Lang(R.raw.korean, "Korean", 1, 4, new KoreanRomanizer(), new String[]{}, 3)
         };
 
         clip = (ClipboardManager) getApplicationContext().getSystemService(Context.CLIPBOARD_SERVICE);
@@ -203,15 +191,20 @@ public class MainActivity extends AppCompatActivity {
 
         private void gen(){
             if (currentMarkov != null) {
-                String[] chars = currentMarkov.generateTokens(MainActivity.random(lang.minLength, lang.maxLength));
                 StringBuffer word = new StringBuffer();
                 int i = 0;
-                for(String s:chars){
-                    if (i > 0 || !isIllegal(lang.illegalStarts, s)){
-                        word.append(s);
-                    }
-                    i++;
+                while(word.length() < lang.minLength) {
+                    String[] chars = currentMarkov.generateTokens(MainActivity.random(lang.minLength, lang.maxLength));
+                    for (String s : chars) {
+                        if (END.equals(s)) {
+                            break;
+                        }
+                        if (i > 0 || !isIllegal(lang.illegalStarts, s)) {
+                            word.append(s);
+                        }
+                        i++;
 
+                    }
                 }
                 wordView.setText(word);
                 if (lang.romanizer != null){
@@ -257,8 +250,8 @@ public class MainActivity extends AppCompatActivity {
             try {
                 // instantiate markov generator
                 return this.loadUniqueNames(
-                        this.readResource(lang.file,this.context)
-                );
+                        this.readResource(lang.file,this.context),
+                        lang.markovFactor);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -272,8 +265,8 @@ public class MainActivity extends AppCompatActivity {
             currentMarkov = riMarkov;
         }
 
-        private RiMarkov loadUniqueNames(List<String> names) {
-            RiMarkov uniqueGen = new RiMarkov(3, false, true);
+        private RiMarkov loadUniqueNames(List<String> names, int factor) {
+            RiMarkov uniqueGen = new RiMarkov(factor, false, true);
             List<Character> tokens = new LinkedList<>();
 
             for (String name : names) {

@@ -8,6 +8,7 @@ import android.content.Context;
  */
 
 public class Lang {
+    public int markovFactor;
     public int file;
     public String lang;
     public int minLength;
@@ -15,12 +16,13 @@ public class Lang {
     public Romanizer romanizer;
     public String[] illegalStarts;
 
-    public Lang(int f, String l, int min, int max, Romanizer r, String[] i) {
+    public Lang(int f, String l, int min, int max, Romanizer r, String[] i, int m) {
         file = f;
         lang = l;
         minLength = min;
         maxLength = max;
         romanizer = r;
         illegalStarts = i;
+        markovFactor = m;
     }
 }
