@@ -25,12 +25,10 @@ import android.widget.Toast;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
 import fr.vahren.MarkovCharGenerator;
-import rita.RiMarkov;
 
 public class MainActivity extends AppCompatActivity {
 
