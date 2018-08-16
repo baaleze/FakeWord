@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import fr.vahren.MarkovCharGenerator;
 import rita.RiMarkov;
 
 public class MainActivity extends AppCompatActivity {
@@ -36,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
     private static Lang[] langs;
 
     private static ClipboardManager clip;
-    private static RiMarkov currentMarkov;
+    private static MarkovCharGenerator currentMarkov;
     private static final String END = "$";
 
     @Override
@@ -164,7 +165,7 @@ public class MainActivity extends AppCompatActivity {
             wordView = rootView.findViewById(R.id.gen_word);
             wordSubView = rootView.findViewById(R.id.word_sub);
             // do this in an async task as it's LOOONG
-            new Markov(rootView).execute(lang);
+            new MarkovTask(rootView).execute(lang);
             // touch
             rootView.setOnClickListener(this);
             rootView.setOnLongClickListener(this);
@@ -191,24 +192,10 @@ public class MainActivity extends AppCompatActivity {
 
         private void gen(){
             if (currentMarkov != null) {
-                StringBuffer word = new StringBuffer();
-                int i = 0;
-                while(word.length() < lang.minLength) {
-                    String[] chars = currentMarkov.generateTokens(MainActivity.random(lang.minLength, lang.maxLength));
-                    for (String s : chars) {
-                        if (END.equals(s)) {
-                            break;
-                        }
-                        if (i > 0 || !isIllegal(lang.illegalStarts, s)) {
-                            word.append(s);
-                        }
-                        i++;
-
-                    }
-                }
+                String word = currentMarkov.generateWord();
                 wordView.setText(word);
                 if (lang.romanizer != null){
-                    wordSubView.setText(lang.romanizer.toRoman(word.toString()));
+                    wordSubView.setText(lang.romanizer.toRoman(word));
                 } else {
                     wordSubView.setText("");
                 }
@@ -226,13 +213,13 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private static class Markov extends AsyncTask<Lang, Void, RiMarkov> {
+    private static class MarkovTask extends AsyncTask<Lang, Double, MarkovCharGenerator> {
 
         private final View view;
         private final Context context;
         private Lang lang;
 
-        public Markov(View rootView) {
+        public MarkovTask(View rootView) {
             this.view = rootView;
             this.context = rootView.getContext();
         }
@@ -245,13 +232,18 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        protected RiMarkov doInBackground(Lang... langs) {
+        protected void onProgressUpdate(Double... values) {
+            ((TextView)view.findViewById(R.id.word_sub)).setText(values[0] + "%");
+        }
+
+        @Override
+        protected MarkovCharGenerator doInBackground(Lang... langs) {
             lang = langs[0];
             try {
                 // instantiate markov generator
                 return this.loadUniqueNames(
                         this.readResource(lang.file,this.context),
-                        lang.markovFactor);
+                        lang.markovFactor, lang.maxLength);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -259,36 +251,19 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        protected void onPostExecute(RiMarkov riMarkov) {
+        protected void onPostExecute(MarkovCharGenerator markov) {
             ((TextView)view.findViewById(R.id.gen_word)).setText("READY");
             ((TextView)view.findViewById(R.id.word_sub)).setText("");
-            currentMarkov = riMarkov;
+            currentMarkov = markov;
         }
 
-        private RiMarkov loadUniqueNames(List<String> names, int factor) {
-            RiMarkov uniqueGen = new RiMarkov(factor, false, true);
-            List<Character> tokens = new LinkedList<>();
-
-            for (String name : names) {
-                char[] chars;
-                int l = (chars = name.toLowerCase().toCharArray()).length;
-
-                for (int i = 0; i < l; ++i) {
-                    char c = chars[i];
-                    tokens.add(c);
-                }
+        private MarkovCharGenerator loadUniqueNames(List<String> names, int factor, int max) {
+            MarkovCharGenerator generator = new MarkovCharGenerator(factor, '$', max);
+            for(int i = 0;i<names.size();i++){
+                generator.loadWord(names.get(i));
+                this.publishProgress((i*100.0)/(double)names.size());
             }
-
-            char[] tokensArray = new char[tokens.size()];
-            int i = 0;
-
-            Character c;
-            for(Iterator var12 = tokens.iterator(); var12.hasNext(); tokensArray[i++] = c) {
-                c = (Character)var12.next();
-            }
-
-            uniqueGen.loadTokens(tokensArray);
-            return uniqueGen;
+            return generator;
         }
 
 
