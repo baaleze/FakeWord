@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 
 import fr.vahren.MarkovCharGenerator;
 
@@ -44,12 +45,14 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         MainActivity.langs = new Lang[]{
-                new Lang(R.raw.french, "French", 4, 12, null, new String[]{"-"}, 5),
-                new Lang(R.raw.english, "English", 4, 12, null, new String[]{"-"}, 5),
-                new Lang(R.raw.japanese, "Japanese", 2, 8, new JapaneseRomanizer(),
+                new Lang(R.raw.french_small, "French", 4, 12, null, new String[]{"-"}, 4),
+                new Lang(R.raw.french_small, "Crazy French", 4, 12, null, new String[]{"-"}, 2),
+                new Lang(R.raw.english_small, "English", 4, 12, null, new String[]{"-"}, 4),
+                new Lang(R.raw.japanese_small, "Japanese", 2, 6, new JapaneseRomanizer(),
                         new String[]{"・", "ょ", "ッ", "っ", "ャ", "ゥ", "ゃ", "ゅ", "ィ", "ァ","ェ", "ォ","ョ", "ー", "ュ" ,"ン", "ん"}, 3),
-                new Lang(R.raw.norsk, "Norwegian", 6, 15, null, new String[]{}, 5),
-                new Lang(R.raw.korean, "Korean", 1, 4, new KoreanRomanizer(), new String[]{}, 3)
+                new Lang(R.raw.norsk_small, "Norwegian", 6, 15, null, new String[]{}, 4),
+                new Lang(R.raw.korean_small, "Korean", 1, 4, new KoreanRomanizer(), new String[]{}, 3),
+                new Lang(R.raw.prenoms, "Prénoms", 1, 4, null, new String[]{}, 2)
         };
 
         clip = (ClipboardManager) getApplicationContext().getSystemService(Context.CLIPBOARD_SERVICE);
@@ -211,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private static class MarkovTask extends AsyncTask<Lang, Double, MarkovCharGenerator> {
+    private static class MarkovTask extends AsyncTask<Lang, Integer, MarkovCharGenerator> {
 
         private final View view;
         private final Context context;
@@ -230,8 +233,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        protected void onProgressUpdate(Double... values) {
-            ((TextView)view.findViewById(R.id.word_sub)).setText(values[0] + "%");
+        protected void onProgressUpdate(Integer... values) {
+            ((TextView)view.findViewById(R.id.word_sub)).setText(values[0] + "/"+values[1]);
         }
 
         @Override
@@ -259,7 +262,7 @@ public class MainActivity extends AppCompatActivity {
             MarkovCharGenerator generator = new MarkovCharGenerator(factor, '$', max);
             for(int i = 0;i<names.size();i++){
                 generator.loadWord(names.get(i));
-                this.publishProgress((i*100.0)/(double)names.size());
+                this.publishProgress(i, names.size());
             }
             return generator;
         }
